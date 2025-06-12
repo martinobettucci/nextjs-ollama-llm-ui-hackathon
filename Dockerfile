@@ -19,12 +19,12 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy built files from the builder stage
-COPY --from=builder /app/.next ./.next
+# Copy the standalone output from Next.js build
+COPY --from=builder /app/.next/standalone ./
+# Copy static files
+COPY --from=builder /app/.next/static ./.next/static  
+# Copy public folder
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
-COPY --from=builder /app/node_modules ./node_modules
 
 # Set environment variable with a default value that can be overridden at runtime
 ENV OLLAMA_URL=http://127.0.0.1:11434
@@ -32,4 +32,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
