@@ -16,6 +16,9 @@ interface State {
   isDownloading: boolean;
   downloadProgress: number;
   downloadingModel: string | null;
+  isRAGEnabled: boolean;
+  ragSimilarityThreshold: number;
+  ragMaxResults: number;
 }
 
 interface Actions {
@@ -30,6 +33,9 @@ interface Actions {
   startDownload: (modelName: string) => void;
   stopDownload: () => void;
   setDownloadProgress: (progress: number) => void;
+  setRAGEnabled: (enabled: boolean) => void;
+  setRAGSimilarityThreshold: (threshold: number) => void;
+  setRAGMaxResults: (maxResults: number) => void;
 }
 
 const useChatStore = create<State & Actions>()(
@@ -42,7 +48,10 @@ const useChatStore = create<State & Actions>()(
       userName: "Anonymous",
       isDownloading: false,
       downloadProgress: 0,
-      downloadingModel: null, 
+      downloadingModel: null,
+      isRAGEnabled: false,
+      ragSimilarityThreshold: 0.5,
+      ragMaxResults: 5,
 
       setBase64Images: (base64Images) => set({ base64Images }),
       setUserName: (userName) => set({ userName }),
@@ -106,6 +115,10 @@ const useChatStore = create<State & Actions>()(
       stopDownload: () =>
         set({ isDownloading: false, downloadingModel: null, downloadProgress: 0 }),
       setDownloadProgress: (progress) => set({ downloadProgress: progress }),
+
+      setRAGEnabled: (enabled) => set({ isRAGEnabled: enabled }),
+      setRAGSimilarityThreshold: (threshold) => set({ ragSimilarityThreshold: threshold }),
+      setRAGMaxResults: (maxResults) => set({ ragMaxResults: maxResults }),
     }),
     {
       name: "nextjs-ollama-ui-state",
@@ -114,6 +127,9 @@ const useChatStore = create<State & Actions>()(
         currentChatId: state.currentChatId,
         selectedModel: state.selectedModel,
         userName: state.userName,
+        isRAGEnabled: state.isRAGEnabled,
+        ragSimilarityThreshold: state.ragSimilarityThreshold,
+        ragMaxResults: state.ragMaxResults,
       }),
     }
   )

@@ -27,6 +27,7 @@ import { set } from "zod";
 import UsernameForm from "./username-form";
 import EditUsernameForm from "./edit-username-form";
 import PullModel from "./pull-model";
+import RAGDocumentManager from "./rag-document-manager";
 import useChatStore from "@/app/hooks/useChatStore";
 
 export default function UserSettings() {
@@ -60,8 +61,13 @@ export default function UserSettings() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-48 p-2">
         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <RAGDocumentManager />
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
           <PullModel />
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <Dialog>
           <DialogTrigger className="w-full">
             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>

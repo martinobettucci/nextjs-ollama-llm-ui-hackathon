@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { Message } from "ai/react";
 import { ChatRequestOptions } from "ai";
 import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, Database } from "lucide-react";
 import Image from "next/image";
 import {
   ChatBubble,
@@ -15,6 +15,13 @@ import {
 import ButtonWithTooltip from "../button-with-tooltip";
 import { Button } from "../ui/button";
 import CodeDisplayBlock from "../code-display-block";
+import { Badge } from "../ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 
 export type ChatMessageProps = {
   message: Message;
@@ -41,22 +48,32 @@ function ChatMessage({ message, isLast, isLoading, reload }: ChatMessageProps) {
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
   // Extract "think" content from Deepseek R1 models and clean message (rest) content
-  const { thinkContent, cleanContent } = useMemo(() => {
+  const { thinkContent, cleanContent, ragContext } = useMemo(() => {
     const getThinkContent = (content: string) => {
       const match = content.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
       return match ? match[1].trim() : null;
     };
 
+    const getRagContext = (content: string) => {
+      const match = content.match(/\[CONTEXT\]([\s\S]*?)\[END CONTEXT\]/);
+      return match ? match[1].trim() : null;
+    };
+
+    const contentWithoutThink = message.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+    const ragContext = getRagContext(contentWithoutThink);
+    const cleanContentWithoutRag = contentWithoutThink.replace(/\[CONTEXT\][\s\S]*?\[END CONTEXT\]\s*/g, '').trim();
+
     return {
       thinkContent: message.role === "assistant" ? getThinkContent(message.content) : null,
-      cleanContent: message.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim(),
+      cleanContent: cleanContentWithoutRag,
+      ragContext: message.role === "user" ? ragContext : null,
     };
   }, [message.content, message.role]);
 
   const contentParts = useMemo(() => cleanContent.split("```"), [cleanContent]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
+    navigator.clipboard.writeText(cleanContent);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };
@@ -88,6 +105,33 @@ function ChatMessage({ message, isLast, isLoading, reload }: ChatMessageProps) {
           <Markdown remarkPlugins={[remarkGfm]}>{thinkContent}</Markdown>
         </div>
       </details>
+    )
+  );
+
+  const renderRAGIndicator = () => (
+    ragContext && message.role === "user" && (
+      <div className="mb-2">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="text-xs cursor-help">
+                <Database className="w-3 h-3 mr-1" />
+                RAG Enhanced
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-md">
+              <div className="text-xs">
+                <p className="font-medium mb-1">Document Context Used:</p>
+                <div className="max-h-32 overflow-y-auto text-muted-foreground">
+                  <Markdown remarkPlugins={[remarkGfm]} className="prose prose-xs">
+                    {ragContext}
+                  </Markdown>
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     )
   );
 
@@ -149,6 +193,7 @@ function ChatMessage({ message, isLast, isLoading, reload }: ChatMessageProps) {
           fallback={message.role === "user" ? "US" : ""}
         />
         <ChatBubbleMessage>
+          {renderRAGIndicator()}
           {renderThinkingProcess()}
           {renderAttachments()}
           {renderContent()}

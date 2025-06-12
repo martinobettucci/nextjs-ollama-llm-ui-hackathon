@@ -13,6 +13,8 @@ import { v4 as uuidv4 } from "uuid";
 import useChatStore from "@/app/hooks/useChatStore";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { getAllChunks, getAllDocuments } from "@/lib/rag-db";
+import { searchSimilarChunks, formatRetrievedContext } from "@/lib/rag-utils";
 
 export interface ChatProps {
   id: string;
@@ -57,11 +59,14 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
   const base64Images = useChatStore((state) => state.base64Images);
   const setBase64Images = useChatStore((state) => state.setBase64Images);
   const selectedModel = useChatStore((state) => state.selectedModel);
+  const isRAGEnabled = useChatStore((state) => state.isRAGEnabled);
+  const ragMaxResults = useChatStore((state) => state.ragMaxResults);
+  const ragSimilarityThreshold = useChatStore((state) => state.ragSimilarityThreshold);
   const saveMessages = useChatStore((state) => state.saveMessages);
   const getMessagesById = useChatStore((state) => state.getMessagesById);
   const router = useRouter();
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     window.history.replaceState({}, "", `/c/${id}`);
 
@@ -70,10 +75,47 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
       return;
     }
 
+    let augmentedInput = input;
+
+    // Perform RAG if enabled
+    if (isRAGEnabled) {
+      try {
+        const chunks = await getAllChunks();
+        
+        if (chunks.length === 0) {
+          toast.warning("RAG is enabled but no documents are uploaded. Upload documents to use RAG functionality.");
+        } else {
+          // Search for similar chunks
+          const results = await searchSimilarChunks(input, chunks, ragMaxResults);
+          
+          // Filter by similarity threshold
+          const filteredResults = results.filter(result => result.similarity >= ragSimilarityThreshold);
+          
+          if (filteredResults.length > 0) {
+            // Format and prepend context to the user's input
+            const contextString = formatRetrievedContext(filteredResults);
+            augmentedInput = contextString + input;
+            
+            // Show a subtle indication that RAG was used
+            toast.success(`Found ${filteredResults.length} relevant document chunks`, {
+              duration: 2000,
+            });
+          } else {
+            toast.info("No relevant documents found for your query", {
+              duration: 2000,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("RAG search error:", error);
+        toast.error("Error searching documents. Proceeding without RAG.");
+      }
+    }
+
     const userMessage: Message = {
       id: generateId(),
       role: "user",
-      content: input,
+      content: input, // Store original input in messages
     };
 
     setLoadingSubmit(true);
@@ -88,6 +130,11 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
     const requestOptions: ChatRequestOptions = {
       body: {
         selectedModel: selectedModel,
+        // Send the augmented input to the API
+        messages: [
+          ...messages,
+          { ...userMessage, content: augmentedInput }
+        ],
       },
       ...(base64Images && {
         data: {
@@ -97,7 +144,18 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
       }),
     };
 
-    handleSubmit(e, requestOptions);
+    // Create a custom event to use the augmented input
+    const customEvent = {
+      ...e,
+      target: {
+        ...e.target,
+        elements: {
+          message: { value: augmentedInput }
+        }
+      }
+    } as any;
+
+    handleSubmit(customEvent, requestOptions);
     saveMessages(id, [...messages, userMessage]);
     setBase64Images(null);
   };
@@ -136,6 +194,15 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
           <p className="text-center text-base text-muted-foreground">
             How can I help you today?
           </p>
+          {isRAGEnabled && (
+            <div className="text-center text-sm text-muted-foreground bg-primary/10 px-4 py-2 rounded-lg">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-medium">RAG Mode Active</span>
+              </div>
+              <p>Your questions will be augmented with relevant information from uploaded documents.</p>
+            </div>
+          )}
           <ChatBottombar
             input={input}
             handleInputChange={handleInputChange}
