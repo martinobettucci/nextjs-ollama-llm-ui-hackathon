@@ -1,8 +1,10 @@
+import { getOllamaUrl } from '@/lib/config';
+
 // app/api/model/route.ts
 export async function POST(req: Request) {
   const { name } = await req.json();
 
-  const ollamaUrl = process.env.OLLAMA_URL;
+  const ollamaUrl = getOllamaUrl();
 
   const response = await fetch(ollamaUrl + "/api/pull", {
     method: "POST",

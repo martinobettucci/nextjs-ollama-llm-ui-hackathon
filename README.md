@@ -41,6 +41,30 @@ To use the web interface, these requisites must be met:
 1. Download [Ollama](https://ollama.com/download) and have it running. Or run it in a Docker container. Check the [docs](https://github.com/ollama/ollama) for instructions.
 2. Node.js (18+) and npm is required. [Download](https://nodejs.org/en/download)
 
+# Configuration
+
+## Ollama URL Configuration
+
+The application supports multiple ways to configure the Ollama URL:
+
+1. **Environment Variable (Recommended for development):**
+   Set the `OLLAMA_URL` environment variable in your `.env` file:
+   ```
+   OLLAMA_URL="http://localhost:11434"
+   ```
+
+2. **Hardcoded URL (For production deployment):**
+   The application includes a hardcoded fallback URL that will be used when no environment variable is set. This is useful for production deployments where you want to ensure the URL is always available.
+   
+   To modify the hardcoded URL, edit `src/lib/config.ts`:
+   ```typescript
+   const HARDCODED_OLLAMA_URL = "http://your-ollama-server:11434";
+   ```
+
+3. **Priority Order:**
+   - Environment variable `OLLAMA_URL` (highest priority)
+   - Hardcoded URL fallback (if environment variable is not set)
+
 # Quick start with Docker
 
 ## Installation with prebuilt Docker image
@@ -55,6 +79,12 @@ docker run -d -p 8080:3000 --add-host=host.docker.internal:host-gateway -e OLLAM
 
 ```
 docker run -d -p 8080:3000 --add-host=host.docker.internal:host-gateway -e OLLAMA_URL=http://example.com:11434 --name nextjs-ollama-ui --restart always jakobhoeg/nextjs-ollama-ui:latest
+```
+
+- **Using hardcoded URL (no environment variable needed)**:
+
+```
+docker run -d -p 8080:3000 --name nextjs-ollama-ui --restart always jakobhoeg/nextjs-ollama-ui:latest
 ```
 
 > You can also change the default 8080 port if you wish.
@@ -87,7 +117,7 @@ git clone https://github.com/jakobhoeg/nextjs-ollama-llm-ui
 cd nextjs-ollama-llm-ui
 ```
 
-**3. Rename the `.example.env` to `.env`:**
+**3. Rename the `.example.env` to `.env` (Optional - only needed if you want to override the hardcoded URL):**
 
 ```
 mv .example.env .env
@@ -98,6 +128,8 @@ mv .example.env .env
 ```
 OLLAMA_URL="http://localhost:11434"
 ```
+
+> **Note:** If you don't set the OLLAMA_URL environment variable, the application will use the hardcoded URL configured in `src/lib/config.ts`.
 
 **5. Install dependencies:**
 
@@ -111,7 +143,7 @@ npm install
 npm run dev
 ```
 
-**5. Go to [localhost:3000](http://localhost:3000) and start chatting with your favourite model!**
+**7. Go to [localhost:3000](http://localhost:3000) and start chatting with your favourite model!**
 
 # Upcoming features
 

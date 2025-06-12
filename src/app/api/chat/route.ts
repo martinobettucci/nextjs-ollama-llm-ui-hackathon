@@ -1,5 +1,6 @@
 import { createOllama } from 'ollama-ai-provider';
 import { streamText, convertToCoreMessages, CoreMessage, UserContent } from 'ai';
+import { getOllamaUrl } from '@/lib/config';
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export async function POST(req: Request) {
   // Destructure request data
   const { messages, selectedModel, data } = await req.json();
 
-  const ollamaUrl = process.env.OLLAMA_URL;
+  const ollamaUrl = getOllamaUrl();
 
   const initialMessages = messages.slice(0, -1); 
   const currentMessage = messages[messages.length - 1]; 
