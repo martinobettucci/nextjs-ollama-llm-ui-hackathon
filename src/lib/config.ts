@@ -7,7 +7,7 @@
  */
 
 // Hardcoded Ollama URL for production deployment
-const HARDCODED_OLLAMA_URL = "http://51.159.155.179:11434";
+const HARDCODED_OLLAMA_URL = "https://hackathon.journeesdecouverte.fr/ollama";
 
 /**
  * Get the Ollama URL from environment variables or fallback to hardcoded value
