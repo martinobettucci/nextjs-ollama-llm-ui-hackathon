@@ -11,6 +11,10 @@ const nextConfig = {
             module: false,
             perf_hooks: false,
           };
+
+          // Exclude onnxruntime-node from client-side bundle
+          config.externals = config.externals || [];
+          config.externals.push('onnxruntime-node');
         }
     
         return config
