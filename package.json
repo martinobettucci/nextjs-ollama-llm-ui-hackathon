@@ -38,6 +38,7 @@
     "langchain": "^0.3.2",
     "lodash": "^4.17.21",
     "lucide-react": "^0.445.0",
+    "mammoth": "^1.9.1",
     "next": "^14.2.13",
     "next-themes": "^0.3.0",
     "ollama-ai-provider": "^0.15.0",

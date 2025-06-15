@@ -33,6 +33,9 @@ import {
 import {
   readFileAsText,
   readPDFAsText,
+  readDOCXAsText,
+  readDOCAsText,
+  readImageAsDataURL,
   processDocument,
 } from "@/lib/rag-utils";
 import { generateUUID } from "@/lib/utils";
@@ -41,7 +44,7 @@ interface RAGDocumentManagerProps {
   onDocumentsChange?: () => void;
 }
 
-export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentManagerProps) {
+export function RAGDocumentManagerPanel({ onDocumentsChange }: RAGDocumentManagerProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
@@ -83,6 +86,12 @@ export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentMan
       let content: string;
       if (file.type === "application/pdf") {
         content = await readPDFAsText(file);
+      } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        content = await readDOCXAsText(file);
+      } else if (file.type === "application/msword") {
+        content = await readDOCAsText(file);
+      } else if (file.type.startsWith("image/")) {
+        content = await readImageAsDataURL(file);
       } else {
         content = await readFileAsText(file);
       }
@@ -141,6 +150,9 @@ export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentMan
     accept: {
       'text/*': ['.txt', '.md', '.json', '.csv', '.log'],
       'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'],
       'application/javascript': ['.js'],
       'application/typescript': ['.ts'],
       'text/javascript': ['.js'],
@@ -168,29 +180,23 @@ export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentMan
     if (type === "application/pdf") {
       return <FileText className="w-4 h-4 text-red-500" />;
     }
+    if (type.startsWith("image/")) {
+      return <FileIcon className="w-4 h-4 text-green-500" />;
+    }
+    if (type.includes("word")) {
+      return <FileIcon className="w-4 h-4 text-blue-500" />;
+    }
     return <FileIcon className="w-4 h-4 text-blue-500" />;
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <div className="flex w-full gap-2 p-1 items-center cursor-pointer">
-          <FileText className="w-4 h-4" />
-          <span>RAG Documents</span>
-          {documents.length > 0 && (
-            <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
-              {documents.length}
-            </span>
-          )}
-        </div>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>RAG Document Manager</DialogTitle>
-          <DialogDescription>
-            Upload documents to enable RAG functionality. Supported formats: TXT, PDF, MD, JS, TS, CSS, HTML, JSON, CSV, and more.
-          </DialogDescription>
-        </DialogHeader>
+    <div className="max-w-4xl max-h-[80vh] flex flex-col">
+      <DialogHeader>
+        <DialogTitle>RAG Document Manager</DialogTitle>
+        <DialogDescription>
+          Upload documents to enable RAG functionality. Supported formats include TXT, PDF, DOCX, images and more.
+        </DialogDescription>
+      </DialogHeader>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0">
           {/* Upload Area */}
@@ -221,7 +227,7 @@ export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentMan
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Processing "{processingFileName}"...</span>
+                <span className="text-sm">Processing &quot;{processingFileName}&quot;...</span>
               </div>
               <Progress value={processingProgress} className="w-full" />
               <p className="text-xs text-muted-foreground">
@@ -299,6 +305,38 @@ export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentMan
             </div>
           )}
         </div>
+    </div>
+  );
+}
+
+export default function RAGDocumentManager({ onDocumentsChange }: RAGDocumentManagerProps) {
+  const [count, setCount] = useState(0);
+
+  const updateCount = async () => {
+    const docs = await getAllDocuments();
+    setCount(docs.length);
+    onDocumentsChange?.();
+  };
+
+  useEffect(() => {
+    updateCount();
+  }, []);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <div className="flex w-full gap-2 p-1 items-center cursor-pointer">
+          <FileText className="w-4 h-4" />
+          <span>RAG Documents</span>
+          {count > 0 && (
+            <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
+              {count}
+            </span>
+          )}
+        </div>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+        <RAGDocumentManagerPanel onDocumentsChange={updateCount} />
       </DialogContent>
     </Dialog>
   );

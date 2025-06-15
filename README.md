@@ -29,6 +29,8 @@ This project aims to be the easiest way for you to get started with LLMs. No ted
 - **Switch between models:** Switch between models fast with a click.
 - **Chat history:** Chats are saved and easily accessed.
 - **Light & Dark mode:** Switch between light & dark mode.
+- **RAG document search:** Upload PDFs, DOCX files or images and query them locally using client-side embeddings.
+- **Knowledge base section:** Manage uploaded documents from a dedicated page.
 
 # Preview
 

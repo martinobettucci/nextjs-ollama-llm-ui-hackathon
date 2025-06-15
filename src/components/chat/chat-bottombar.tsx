@@ -20,6 +20,7 @@ import useChatStore from "@/app/hooks/useChatStore";
 import Image from "next/image";
 import { ChatRequestOptions, Message } from "ai";
 import { ChatInput } from "../ui/chat/chat-input";
+import { Switch } from "../ui/switch";
 
 interface ChatBottombarProps {
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -45,6 +46,8 @@ export default function ChatBottombar({
   const base64Images = useChatStore((state) => state.base64Images);
   const setBase64Images = useChatStore((state) => state.setBase64Images);
   const selectedModel = useChatStore((state) => state.selectedModel);
+  const isRAGEnabled = useChatStore((state) => state.isRAGEnabled);
+  const setRAGEnabled = useChatStore((state) => state.setRAGEnabled);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -129,7 +132,15 @@ export default function ChatBottombar({
                   disabled={isLoading}
                   onImagesPick={setBase64Images}
                 />
-                <div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Switch
+                      checked={isRAGEnabled}
+                      onCheckedChange={setRAGEnabled}
+                      disabled={isLoading}
+                    />
+                    <span className="text-xs">RAG</span>
+                  </div>
                   {/* Microphone button with animation when listening */}
                   <Button
                     className={`shrink-0 rounded-full ${

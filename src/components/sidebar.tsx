@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MoreHorizontal, SquarePen, Trash2 } from "lucide-react";
+import { Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Message } from "ai/react";
@@ -79,6 +80,22 @@ export function Sidebar({
             New chat
           </div>
           <SquarePen size={18} className="shrink-0 w-4 h-4" />
+        </Button>
+
+        <Button
+          onClick={() => {
+            router.push("/kb");
+            if (closeSidebar) {
+              closeSidebar();
+            }
+          }}
+          variant="ghost"
+          className="flex justify-between w-full h-14 text-sm xl:text-lg font-normal items-center"
+        >
+          <div className="flex gap-3 items-center">
+            <Database className="w-4 h-4" />
+            Knowledge base
+          </div>
         </Button>
 
         <div className="flex flex-col pt-10 gap-2">
