@@ -2,24 +2,35 @@ import { pipeline, Pipeline } from '@xenova/transformers';
 import { Document, DocumentChunk } from './rag-db';
 import { generateUUID } from './utils';
 
-// Global embedding pipeline instance
-let embeddingPipeline: Pipeline | null = null;
+// Global embedding pipelines
+let textEmbeddingPipeline: Pipeline | null = null;
+let imageEmbeddingPipeline: Pipeline | null = null;
 
 // Configuration
 const CHUNK_SIZE = 512; // Characters per chunk
 const CHUNK_OVERLAP = 50; // Overlap between chunks
-const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
+const TEXT_EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
+const IMAGE_EMBEDDING_MODEL = 'Xenova/clip-vit-base-patch32';
 
 /**
  * Initialize the embedding pipeline
  */
-export async function initializeEmbeddingPipeline(): Promise<Pipeline> {
-  if (!embeddingPipeline) {
-    console.log('Initializing embedding pipeline...');
-    embeddingPipeline = await pipeline('feature-extraction', EMBEDDING_MODEL);
-    console.log('Embedding pipeline initialized');
+export async function initializeTextEmbeddingPipeline(): Promise<Pipeline> {
+  if (!textEmbeddingPipeline) {
+    console.log('Initializing text embedding pipeline...');
+    textEmbeddingPipeline = await pipeline('feature-extraction', TEXT_EMBEDDING_MODEL);
+    console.log('Text embedding pipeline initialized');
   }
-  return embeddingPipeline;
+  return textEmbeddingPipeline;
+}
+
+export async function initializeImageEmbeddingPipeline(): Promise<Pipeline> {
+  if (!imageEmbeddingPipeline) {
+    console.log('Initializing image embedding pipeline...');
+    imageEmbeddingPipeline = await pipeline('feature-extraction', IMAGE_EMBEDDING_MODEL);
+    console.log('Image embedding pipeline initialized');
+  }
+  return imageEmbeddingPipeline;
 }
 
 /**
@@ -69,8 +80,8 @@ export function chunkText(text: string): { content: string; startIndex: number; 
 /**
  * Generate embeddings for text
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const pipeline = await initializeEmbeddingPipeline();
+export async function generateTextEmbedding(text: string): Promise<number[]> {
+  const pipeline = await initializeTextEmbeddingPipeline();
   const output = await pipeline(text, { pooling: 'mean', normalize: true });
   return Array.from(output.data);
 }
@@ -78,15 +89,24 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 /**
  * Generate embeddings for multiple text chunks
  */
-export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+export async function generateTextEmbeddings(texts: string[]): Promise<number[][]> {
   const embeddings: number[][] = [];
-  
+
   for (const text of texts) {
-    const embedding = await generateEmbedding(text);
+    const embedding = await generateTextEmbedding(text);
     embeddings.push(embedding);
   }
-  
+
   return embeddings;
+}
+
+/**
+ * Generate embedding for an image (data URL)
+ */
+export async function generateImageEmbedding(dataUrl: string): Promise<number[]> {
+  const pipeline = await initializeImageEmbeddingPipeline();
+  const output = await pipeline(dataUrl, { pooling: 'mean', normalize: true });
+  return Array.from(output.data);
 }
 
 /**
@@ -117,29 +137,44 @@ export async function processDocument(
   document: Document,
   onProgress?: (progress: number) => void
 ): Promise<DocumentChunk[]> {
-  // Chunk the text
-  const textChunks = chunkText(document.content);
   const chunks: DocumentChunk[] = [];
-  
+
   onProgress?.(0);
-  
-  // Generate embeddings for each chunk
+
+  if (document.type.startsWith('image/')) {
+    const embedding = await generateImageEmbedding(document.content);
+    chunks.push({
+      id: generateUUID(),
+      documentId: document.id,
+      content: document.content,
+      embedding,
+      type: document.type,
+      startIndex: 0,
+      endIndex: 0
+    });
+    onProgress?.(1);
+    return chunks;
+  }
+
+  const textChunks = chunkText(document.content);
+
   for (let i = 0; i < textChunks.length; i++) {
     const textChunk = textChunks[i];
-    const embedding = await generateEmbedding(textChunk.content);
-    
+    const embedding = await generateTextEmbedding(textChunk.content);
+
     chunks.push({
       id: generateUUID(),
       documentId: document.id,
       content: textChunk.content,
       embedding,
+      type: document.type,
       startIndex: textChunk.startIndex,
       endIndex: textChunk.endIndex
     });
-    
+
     onProgress?.((i + 1) / textChunks.length);
   }
-  
+
   return chunks;
 }
 
@@ -156,7 +191,7 @@ export async function searchSimilarChunks(
   }
   
   // Generate embedding for the query
-  const queryEmbedding = await generateEmbedding(query);
+  const queryEmbedding = await generateTextEmbedding(query);
   
   // Calculate similarities
   const similarities = chunks.map(chunk => ({
@@ -229,16 +264,72 @@ export async function readPDFAsText(file: File): Promise<string> {
 }
 
 /**
+ * Read DOCX file content using mammoth
+ */
+export async function readDOCXAsText(file: File): Promise<string> {
+  const mammoth = await import('mammoth/mammoth.browser');
+  const arrayBuffer = await file.arrayBuffer();
+  const { value } = await mammoth.extractRawText({ arrayBuffer });
+  return value;
+}
+
+/**
+ * Read DOC file content (legacy format)
+ */
+export async function readDOCAsText(file: File): Promise<string> {
+  try {
+    const mammoth = await import('mammoth/mammoth.browser');
+    const arrayBuffer = await file.arrayBuffer();
+    const { value } = await mammoth.extractRawText({ arrayBuffer });
+    return value;
+  } catch (error) {
+    throw new Error('Unable to parse DOC file');
+  }
+}
+
+/**
+ * Read image file as base64 data URL
+ */
+export async function readImageAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to read image'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Error reading image file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Format retrieved context for the LLM prompt
  */
-export function formatRetrievedContext(results: { chunk: DocumentChunk; similarity: number }[]): string {
+export function formatRetrievedContext(results: { chunk: DocumentChunk; similarity: number }[]): { contextText: string; images: string[] } {
   if (results.length === 0) {
-    return '';
+    return { contextText: '', images: [] };
   }
-  
-  const contextSections = results.map((result, index) => {
-    return `[Document ${index + 1}] (Relevance: ${(result.similarity * 100).toFixed(1)}%)\n${result.chunk.content}`;
-  });
-  
-  return `[CONTEXT]\nThe following information has been retrieved from your uploaded documents to help answer your question:\n\n${contextSections.join('\n\n')}\n\n[END CONTEXT]\n\n`;
+
+  const contextSections: string[] = [];
+  const images: string[] = [];
+
+  let textIndex = 1;
+
+  for (const result of results) {
+    if (result.chunk.type.startsWith('image/')) {
+      images.push(result.chunk.content);
+    } else {
+      contextSections.push(`[Document ${textIndex}] (Relevance: ${(result.similarity * 100).toFixed(1)}%)\n${result.chunk.content}`);
+      textIndex++;
+    }
+  }
+
+  const contextText = contextSections.length > 0
+    ? `[CONTEXT]\nThe following information has been retrieved from your uploaded documents to help answer your question:\n\n${contextSections.join('\n\n')}\n\n[END CONTEXT]\n\n`
+    : '';
+
+  return { contextText, images };
 }

@@ -15,6 +15,7 @@ export interface DocumentChunk {
   documentId: string;
   content: string;
   embedding: number[];
+  type: string;
   startIndex: number;
   endIndex: number;
 }

@@ -76,6 +76,7 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
     }
 
     let augmentedInput = input;
+    let retrievedImages: string[] = [];
 
     // Perform RAG if enabled
     if (isRAGEnabled) {
@@ -87,16 +88,15 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
         } else {
           // Search for similar chunks
           const results = await searchSimilarChunks(input, chunks, ragMaxResults);
-          
+
           // Filter by similarity threshold
           const filteredResults = results.filter(result => result.similarity >= ragSimilarityThreshold);
-          
+
           if (filteredResults.length > 0) {
-            // Format and prepend context to the user's input
-            const contextString = formatRetrievedContext(filteredResults);
-            augmentedInput = contextString + input;
-            
-            // Show a subtle indication that RAG was used
+            const { contextText, images: ragImages } = formatRetrievedContext(filteredResults);
+            augmentedInput = contextText + input;
+            retrievedImages = ragImages;
+
             toast.success(`Found ${filteredResults.length} relevant document chunks`, {
               duration: 2000,
             });
@@ -120,12 +120,18 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
 
     setLoadingSubmit(true);
 
-    const attachments: Attachment[] = base64Images
-      ? base64Images.map((image) => ({
-          contentType: "image/base64",
-          url: image,
-        }))
-      : [];
+    const attachments: Attachment[] = [
+      ...(base64Images
+        ? base64Images.map((image) => ({
+            contentType: "image/base64",
+            url: image,
+          }))
+        : []),
+      ...retrievedImages.map((image) => ({
+        contentType: "image/base64",
+        url: image,
+      })),
+    ];
 
     const requestOptions: ChatRequestOptions = {
       body: {
@@ -136,9 +142,9 @@ export default function Chat({ initialMessages, id, isMobile }: ChatProps) {
           { ...userMessage, content: augmentedInput }
         ],
       },
-      ...(base64Images && {
+      ...((base64Images || retrievedImages.length > 0) && {
         data: {
-          images: base64Images,
+          images: [...(base64Images || []), ...retrievedImages],
         },
         experimental_attachments: attachments,
       }),
